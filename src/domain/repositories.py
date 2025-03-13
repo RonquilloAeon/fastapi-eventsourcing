@@ -34,7 +34,7 @@ class EventSourcingApplication(Application):
                 env_vars["EVENTSOURCING_POSTGRES_USER"] = user_pass[0]
                 env_vars["EVENTSOURCING_POSTGRES_PASSWORD"] = user_pass[1]
 
-        super().__init__(env_vars=env_vars, **kwargs)
+        super().__init__(env_vars, **kwargs)
 
 
 class UnitRepository(EventSourcingApplication):

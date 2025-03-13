@@ -14,6 +14,7 @@ eventsourcing = "^9.3.5"
 psycopg = {extras = ["binary", "pool"], version = "^3.2.6"}
 strawberry-graphql = "^0.262.4"
 pre-commit = "^4.1.0"
+uvicorn = "^0.34.0"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -14,8 +14,17 @@ RUN poetry config virtualenvs.create false
 # Install dependencies
 RUN poetry install --no-dev --no-interaction --no-ansi
 
+# Run as non-root user for better security
+RUN useradd --create-home appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
 # Copy the rest of the application
-COPY . .
+COPY src /app/src/
+
+# Expose the port the app runs on
+EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+ENTRYPOINT ["uvicorn"]
+CMD ["src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

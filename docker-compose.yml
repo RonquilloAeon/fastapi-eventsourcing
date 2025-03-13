@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build:
@@ -8,7 +6,7 @@ services:
     ports:
       - "8002:8000"
     volumes:
-      - .:/app
+      - ./src:/app/src
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/fastapi_eventsourcing
       - EVENTSOURCING_POSTGRES_SCHEMA=event_store
