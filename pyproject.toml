@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "fastapi-eventsourcing"
+version = "0.1.0"
+description = "Sample eventsourced GQL API with FastAPI."
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+fastapi = "^0.115.11"
+eventsourcing = "^9.3.5"
+psycopg = {extras = ["binary", "pool"], version = "^3.2.6"}
+strawberry-graphql = "^0.262.4"
+pre-commit = "^4.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+ruff = "^0.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
