@@ -75,7 +75,7 @@ def test_approve_tenant_mutation(client, tenant_repository):
         dob=date(1995, 10, 10),
         is_approved=False,
     )
-    tenant_repository.save(tenant)
+    tenant_repository.create(tenant)
 
     query = f"""
     mutation {{
@@ -154,7 +154,7 @@ def test_approved_tenants_query(client, tenant_repository):
     )
 
     for tenant in [approved, unapproved]:
-        tenant_repository.save(tenant)
+        tenant_repository.create(tenant)
 
     # Query approved tenants
     query = """

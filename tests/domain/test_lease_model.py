@@ -1,7 +1,7 @@
 import pytest
 from uuid import UUID
 from datetime import date, timedelta
-from src.domain.models import Lease
+from src.domain.models import Lease, Tenant
 
 
 def test_lease_creation(sample_unit, sample_tenant):
@@ -41,18 +41,16 @@ def test_lease_add_tenant(sample_lease, tenant_repository):
     from datetime import date
 
     # Create a second tenant
-    tenant2 = tenant_repository._repository.create_originator(
-        OriginatorID=UUID,
-        OriginatorVersion=int,
+    tenant2 = Tenant.create(
         identification_number="444-55-6666",
         first_name="Additional",
         last_name="Tenant",
         email="additional@example.com",
         phone_number="555-444-3333",
         dob=date(1990, 6, 15),
-        is_approved=True,
-        created_at=date.today(),
     )
+    tenant2.approve()  # Approve the tenant
+    tenant_repository.save(tenant2)
 
     initial_tenant_count = len(sample_lease.tenant_ids)
 

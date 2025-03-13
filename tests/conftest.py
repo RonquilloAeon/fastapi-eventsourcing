@@ -57,7 +57,7 @@ def sample_unit(unit_repository):
     unit = Unit.create(
         address="123 Test St, Apt 1, Test City, TC 12345", amenities=["Parking", "Pool"]
     )
-    unit_repository.save(unit)
+    unit_repository.create(unit)
     return unit
 
 
@@ -74,7 +74,7 @@ def sample_tenant(tenant_repository):
         dob=date(1980, 1, 1),
     )
     tenant.approve()  # Approve the tenant for testing
-    tenant_repository.save(tenant)
+    tenant_repository.create(tenant)
     return tenant
 
 
@@ -92,5 +92,5 @@ def sample_lease(lease_repository, sample_unit, sample_tenant):
         start_date=start_date,
         end_date=end_date,
     )
-    lease_repository.save(lease)
+    lease_repository.create(lease)
     return lease

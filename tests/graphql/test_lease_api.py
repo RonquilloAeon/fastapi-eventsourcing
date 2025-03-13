@@ -75,7 +75,7 @@ def test_active_leases_query(
     unit1 = unit_repository._repository.create_originator(
         address="Active Lease Unit", is_leasable=True, is_leased=False, amenities=[]
     )
-    unit_repository.save(unit1)
+    unit_repository.create(unit1)
 
     tenant1 = tenant_repository._repository.create_originator(
         identification_number="active-lease-tenant",
@@ -86,7 +86,7 @@ def test_active_leases_query(
         dob=date(1985, 5, 15),
         is_approved=True,
     )
-    tenant_repository.save(tenant1)
+    tenant_repository.create(tenant1)
 
     # Create an active lease (signed and within date range)
     today = date.today()
@@ -179,7 +179,7 @@ def test_create_lease_validation(client, sample_unit, tenant_repository):
         dob=date(1982, 3, 20),
         is_approved=False,
     )
-    tenant_repository.save(unapproved_tenant)
+    tenant_repository.create(unapproved_tenant)
 
     start_date = date.today()
     end_date = start_date + timedelta(days=365)

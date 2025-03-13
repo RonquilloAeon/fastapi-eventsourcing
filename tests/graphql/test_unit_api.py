@@ -42,7 +42,7 @@ def test_get_units_query(client, unit_repository):
         unit = unit_repository._repository.create_originator(
             address=address, amenities=[], is_leasable=True, is_leased=False
         )
-        unit_repository.save(unit)
+        unit_repository.create(unit)
 
     # Query the units through the API
     query = """
@@ -137,7 +137,7 @@ def test_available_units_query(client, unit_repository):
     )
 
     for unit in [leased_unit, unleasable_unit]:
-        unit_repository.save(unit)
+        unit_repository.create(unit)
 
     # Query available units
     query = """

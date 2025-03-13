@@ -32,7 +32,7 @@ def test_get_all_units(unit_repository):
 
     for address in addresses:
         unit = Unit.create(address=address)
-        unit_repository.save(unit)
+        unit_repository.create(unit)
 
     # Retrieve all units
     units = unit_repository.get_all()
@@ -55,17 +55,17 @@ def test_get_available_units(unit_repository):
 
     # Available unit (leasable and not leased)
     available_unit = Unit.create(address=available_address)
-    unit_repository.save(available_unit)
+    unit_repository.create(available_unit)
 
     # Leased unit (leasable but leased)
     leased_unit = Unit.create(address=leased_address)
     leased_unit.mark_as_leased()
-    unit_repository.save(leased_unit)
+    unit_repository.create(leased_unit)
 
     # Unleasable unit
     unleasable_unit = Unit.create(address=unleasable_address)
     unleasable_unit.mark_as_unleasable()
-    unit_repository.save(unleasable_unit)
+    unit_repository.create(unleasable_unit)
 
     # Retrieve available units
     available_units = unit_repository.get_available_units()
@@ -73,19 +73,3 @@ def test_get_available_units(unit_repository):
     # Verify only the available unit is returned
     assert len(available_units) == 1
     assert available_units[0].address == available_address
-
-
-def test_delete_unit(unit_repository):
-    """Test deleting a unit through repository"""
-    # Create and save a unit
-    unit = Unit.create(address="Delete Test Address")
-    unit_repository.save(unit)
-
-    # Verify unit exists
-    assert unit_repository.get(unit.id) is not None
-
-    # Delete the unit
-    unit_repository.delete(unit)
-
-    # Verify unit no longer exists
-    assert unit_repository.get(unit.id) is None

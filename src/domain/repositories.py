@@ -2,7 +2,7 @@ from typing import List, Optional, Union, Iterator, Tuple
 from uuid import UUID, uuid5, NAMESPACE_URL
 from datetime import date
 
-from eventsourcing.application import Application
+from eventsourcing.application import Application, AggregateNotFoundError
 from eventsourcing.domain import DomainEvent
 from eventsourcing.persistence import Transcoding
 from eventsourcing.application import EventSourcedLog
@@ -72,19 +72,15 @@ class UnitRepository(EventSourcingApplication):
     def get(self, unit_id: Union[str, UUID]) -> Optional[Unit]:
         try:
             return self.repository.get(unit_id)
-        except KeyError:
+        except AggregateNotFoundError:
             return None
 
     def get_all(self) -> List[Unit]:
         units = []
         for notification in self.unit_log.get():
-            try:
-                unit = self.repository.get(notification.unit_id)
-                if isinstance(unit, Unit):
-                    units.append(unit)
-            except KeyError:
-                # Entity might have been deleted
-                continue
+            unit = self.repository.get(notification.unit_id)
+            if isinstance(unit, Unit):
+                units.append(unit)
         return units
 
     def get_units(
@@ -108,9 +104,6 @@ class UnitRepository(EventSourcingApplication):
         units = self.get_all()
         return [unit for unit in units if unit.is_leasable and not unit.is_leased]
 
-    def delete(self, unit: Unit) -> None:
-        self.repository.delete(unit.id)
-
 
 class TenantRepository(EventSourcingApplication):
     """Repository for Tenant aggregates"""
@@ -130,19 +123,15 @@ class TenantRepository(EventSourcingApplication):
     def get(self, tenant_id: Union[str, UUID]) -> Optional[Tenant]:
         try:
             return self.repository.get(tenant_id)
-        except KeyError:
+        except AggregateNotFoundError:
             return None
 
     def get_all(self) -> List[Tenant]:
         tenants = []
         for notification in self.tenant_log.get():
-            try:
-                tenant = self.repository.get(notification.tenant_id)
-                if isinstance(tenant, Tenant):
-                    tenants.append(tenant)
-            except KeyError:
-                # Entity might have been deleted
-                continue
+            tenant = self.repository.get(notification.tenant_id)
+            if isinstance(tenant, Tenant):
+                tenants.append(tenant)
         return tenants
 
     def get_tenants(
@@ -176,9 +165,6 @@ class TenantRepository(EventSourcingApplication):
         tenants = self.get_all()
         return [tenant for tenant in tenants if tenant.is_approved]
 
-    def delete(self, tenant: Tenant) -> None:
-        self.repository.delete(tenant.id)
-
 
 class LeaseRepository(EventSourcingApplication):
     """Repository for Lease aggregates"""
@@ -202,19 +188,15 @@ class LeaseRepository(EventSourcingApplication):
     def get(self, lease_id: Union[str, UUID]) -> Optional[Lease]:
         try:
             return self.repository.get(lease_id)
-        except KeyError:
+        except AggregateNotFoundError:
             return None
 
     def get_all(self) -> List[Lease]:
         leases = []
         for notification in self.lease_log.get():
-            try:
-                lease = self.repository.get(notification.lease_id)
-                if isinstance(lease, Lease):
-                    leases.append(lease)
-            except KeyError:
-                # Entity might have been deleted
-                continue
+            lease = self.repository.get(notification.lease_id)
+            if isinstance(lease, Lease):
+                leases.append(lease)
         return leases
 
     def get_leases(
@@ -258,6 +240,3 @@ class LeaseRepository(EventSourcingApplication):
             for lease in leases
             if lease.signed_by_tenant and lease.start_date <= today <= lease.end_date
         ]
-
-    def delete(self, lease: Lease) -> None:
-        self.repository.delete(lease.id)
