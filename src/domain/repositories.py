@@ -1,6 +1,5 @@
 from typing import List, Optional, Union, Iterator, Tuple
 from uuid import UUID, uuid5, NAMESPACE_URL
-import os
 from datetime import date
 
 from eventsourcing.application import Application
@@ -30,33 +29,6 @@ class DateTranscoding(Transcoding):
 class EventSourcingApplication(Application):
     """Base application class for our event-sourced system"""
 
-    def __init__(self, env_vars=None, **kwargs):
-        # Read PostgreSQL connection from environment vars if not provided
-        if env_vars is None:
-            env_vars = {}
-
-        if "EVENTSOURCING_POSTGRES_DBNAME" not in env_vars:
-            database_url = os.environ.get(
-                "DATABASE_URL",
-                "postgresql://postgres:postgres@localhost:5432/fastapi_eventsourcing",
-            )
-            # Parse database URL into components for eventsourcing library
-            if database_url.startswith("postgresql://"):
-                parts = database_url.replace("postgresql://", "").split("@")
-                user_pass = parts[0].split(":")
-                host_port_db = parts[1].split("/")
-                host_port = host_port_db[0].split(":")
-
-                env_vars["EVENTSOURCING_POSTGRES_DBNAME"] = host_port_db[1]
-                env_vars["EVENTSOURCING_POSTGRES_HOST"] = host_port[0]
-                env_vars["EVENTSOURCING_POSTGRES_PORT"] = (
-                    host_port[1] if len(host_port) > 1 else "5432"
-                )
-                env_vars["EVENTSOURCING_POSTGRES_USER"] = user_pass[0]
-                env_vars["EVENTSOURCING_POSTGRES_PASSWORD"] = user_pass[1]
-
-        super().__init__(env_vars, **kwargs)
-
     def register_transcodings(self, transcoder):
         """Register custom transcodings"""
         super().register_transcodings(transcoder)
@@ -81,16 +53,21 @@ class LeaseLogged(DomainEvent):
 class UnitRepository(EventSourcingApplication):
     """Repository for Unit aggregates"""
 
+    name = "unit"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.unit_log: EventSourcedLog[UnitLogged] = EventSourcedLog(
             self.events, uuid5(NAMESPACE_URL, "/unit_log"), UnitLogged
         )
 
-    def save(self, unit: Unit) -> None:
+    def create(self, unit: Unit) -> None:
+        logged = self.unit_log.trigger_event(unit_id=unit.id)
+        self.save(unit, logged)
+
+    def save(self, unit: Unit, *args, **kwargs) -> None:
         # Use save() method from the Application class to save the aggregate
-        super().save(unit)
-        self.unit_log.trigger_event(unit_id=unit.id)
+        super().save(unit, *args, **kwargs)
 
     def get(self, unit_id: Union[str, UUID]) -> Optional[Unit]:
         try:
@@ -138,16 +115,17 @@ class UnitRepository(EventSourcingApplication):
 class TenantRepository(EventSourcingApplication):
     """Repository for Tenant aggregates"""
 
+    name = "tenant"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tenant_log: EventSourcedLog[TenantLogged] = EventSourcedLog(
             self.events, uuid5(NAMESPACE_URL, "/tenant_log"), TenantLogged
         )
 
-    def save(self, tenant: Tenant) -> None:
-        # Use save() method from the Application class to save the aggregate
-        super().save(tenant)
-        self.tenant_log.trigger_event(tenant_id=tenant.id)
+    def create(self, tenant: Tenant) -> None:
+        logged = self.tenant_log.trigger_event(tenant_id=tenant.id)
+        self.save(tenant, logged)
 
     def get(self, tenant_id: Union[str, UUID]) -> Optional[Tenant]:
         try:
@@ -205,16 +183,21 @@ class TenantRepository(EventSourcingApplication):
 class LeaseRepository(EventSourcingApplication):
     """Repository for Lease aggregates"""
 
+    name = "lease"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lease_log: EventSourcedLog[LeaseLogged] = EventSourcedLog(
             self.events, uuid5(NAMESPACE_URL, "/lease_log"), LeaseLogged
         )
 
-    def save(self, lease: Lease) -> None:
+    def create(self, lease: Lease) -> None:
+        logged = self.lease_log.trigger_event(lease_id=lease.id)
+        self.save(lease, logged)
+
+    def save(self, lease: Lease, *args, **kwargs) -> None:
         # Use save() method from the Application class to save the aggregate
-        super().save(lease)
-        self.lease_log.trigger_event(lease_id=lease.id)
+        super().save(lease, *args, **kwargs)
 
     def get(self, lease_id: Union[str, UUID]) -> Optional[Lease]:
         try:

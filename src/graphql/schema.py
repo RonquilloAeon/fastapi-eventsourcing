@@ -187,7 +187,7 @@ class Mutation:
     def create_unit(self, input: UnitInput) -> UnitType:
         repo = UnitRepository()
         unit = Unit.create(address=input.address, amenities=input.amenities)
-        repo.save(unit)
+        repo.create(unit)
         return unit
 
     @strawberry.mutation
@@ -244,7 +244,7 @@ class Mutation:
             phone_number=input.phone_number,
             dob=input.dob,
         )
-        repo.save(tenant)
+        repo.create(tenant)
         return tenant
 
     @strawberry.mutation
@@ -313,7 +313,7 @@ class Mutation:
             start_date=input.start_date,
             end_date=input.end_date,
         )
-        lease_repo.save(lease)
+        lease_repo.create(lease)
         return lease
 
     @strawberry.mutation

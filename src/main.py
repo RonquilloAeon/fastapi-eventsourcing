@@ -2,8 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import strawberry
 from strawberry.fastapi import GraphQLRouter
-
 from .graphql.schema import Query, Mutation
+from .domain.repositories import UnitRepository, TenantRepository, LeaseRepository
+
+# Create repositories for initializing database
+unit_repo = UnitRepository()
+tenant_repo = TenantRepository()
+lease_repo = LeaseRepository()
 
 # Initialize FastAPI app
 app = FastAPI(title="FastAPI EventSourcing GraphQL API")

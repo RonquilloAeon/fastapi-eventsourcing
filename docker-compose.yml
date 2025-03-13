@@ -8,8 +8,14 @@ services:
     volumes:
       - ./src:/app/src
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fastapi_eventsourcing
-      - EVENTSOURCING_POSTGRES_SCHEMA=event_store
+      - CREATE_TABLE=y
+      - PERSISTENCE_MODULE=eventsourcing.postgres
+      - POSTGRES_DBNAME=fastapi_eventsourcing
+      - POSTGRES_HOST=db
+      - POSTGRES_POOL_SIZE=5
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     depends_on:
       - db
     restart: on-failure
