@@ -1,9 +1,30 @@
-from eventsourcing.application import Application
-from typing import List, Optional, Union
-from uuid import UUID
+from typing import List, Optional, Union, Iterator, Tuple
+from uuid import UUID, uuid5, NAMESPACE_URL
 import os
+from datetime import date
+
+from eventsourcing.application import Application
+from eventsourcing.domain import DomainEvent
+from eventsourcing.persistence import Transcoding
+from eventsourcing.application import EventSourcedLog
 
 from .models import Unit, Tenant, Lease
+
+
+# Custom transcoding for date objects
+class DateTranscoding(Transcoding):
+    """Custom transcoding for datetime.date objects"""
+
+    type = date
+    name = "date"
+
+    def encode(self, obj: date) -> str:
+        """Convert date to ISO format string"""
+        return obj.isoformat()
+
+    def decode(self, data: str) -> date:
+        """Convert ISO format string to date object"""
+        return date.fromisoformat(data)
 
 
 class EventSourcingApplication(Application):
@@ -36,12 +57,40 @@ class EventSourcingApplication(Application):
 
         super().__init__(env_vars, **kwargs)
 
+    def register_transcodings(self, transcoder):
+        """Register custom transcodings"""
+        super().register_transcodings(transcoder)
+        transcoder.register(DateTranscoding())
+
+
+# Domain event for logging unit operations
+class UnitLogged(DomainEvent):
+    unit_id: UUID
+
+
+# Domain event for logging tenant operations
+class TenantLogged(DomainEvent):
+    tenant_id: UUID
+
+
+# Domain event for logging lease operations
+class LeaseLogged(DomainEvent):
+    lease_id: UUID
+
 
 class UnitRepository(EventSourcingApplication):
     """Repository for Unit aggregates"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.unit_log: EventSourcedLog[UnitLogged] = EventSourcedLog(
+            self.events, uuid5(NAMESPACE_URL, "/unit_log"), UnitLogged
+        )
+
     def save(self, unit: Unit) -> None:
-        self.save_aggregate(unit)
+        # Use save() method from the Application class to save the aggregate
+        super().save(unit)
+        self.unit_log.trigger_event(unit_id=unit.id)
 
     def get(self, unit_id: Union[str, UUID]) -> Optional[Unit]:
         try:
@@ -50,11 +99,32 @@ class UnitRepository(EventSourcingApplication):
             return None
 
     def get_all(self) -> List[Unit]:
-        return [
-            self.repository.get(unit_id)
-            for unit_id in self.repository.get_all_notifications()
-            if isinstance(self.repository.get(unit_id), Unit)
-        ]
+        units = []
+        for notification in self.unit_log.get():
+            try:
+                unit = self.repository.get(notification.unit_id)
+                if isinstance(unit, Unit):
+                    units.append(unit)
+            except KeyError:
+                # Entity might have been deleted
+                continue
+        return units
+
+    def get_units(
+        self,
+        *,
+        gt: int | None = None,
+        lte: int | None = None,
+        desc: bool = True,
+        limit: int | None = None,
+    ) -> Iterator[Tuple[int, Unit]]:
+        """Get units with their notification positions for cursor-based pagination."""
+        for notification in self.unit_log.get(gt=gt, lte=lte, desc=desc, limit=limit):
+            try:
+                unit = self.repository.get(notification.unit_id)
+                yield notification.originator_version, unit
+            except KeyError:
+                continue
 
     def get_available_units(self) -> List[Unit]:
         """Get all units that are leasable and not currently leased"""
@@ -68,8 +138,16 @@ class UnitRepository(EventSourcingApplication):
 class TenantRepository(EventSourcingApplication):
     """Repository for Tenant aggregates"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tenant_log: EventSourcedLog[TenantLogged] = EventSourcedLog(
+            self.events, uuid5(NAMESPACE_URL, "/tenant_log"), TenantLogged
+        )
+
     def save(self, tenant: Tenant) -> None:
-        self.save_aggregate(tenant)
+        # Use save() method from the Application class to save the aggregate
+        super().save(tenant)
+        self.tenant_log.trigger_event(tenant_id=tenant.id)
 
     def get(self, tenant_id: Union[str, UUID]) -> Optional[Tenant]:
         try:
@@ -78,11 +156,32 @@ class TenantRepository(EventSourcingApplication):
             return None
 
     def get_all(self) -> List[Tenant]:
-        return [
-            self.repository.get(tenant_id)
-            for tenant_id in self.repository.get_all_notifications()
-            if isinstance(self.repository.get(tenant_id), Tenant)
-        ]
+        tenants = []
+        for notification in self.tenant_log.get():
+            try:
+                tenant = self.repository.get(notification.tenant_id)
+                if isinstance(tenant, Tenant):
+                    tenants.append(tenant)
+            except KeyError:
+                # Entity might have been deleted
+                continue
+        return tenants
+
+    def get_tenants(
+        self,
+        *,
+        gt: int | None = None,
+        lte: int | None = None,
+        desc: bool = True,
+        limit: int | None = None,
+    ) -> Iterator[Tuple[int, Tenant]]:
+        """Get tenants with their notification positions for cursor-based pagination."""
+        for notification in self.tenant_log.get(gt=gt, lte=lte, desc=desc, limit=limit):
+            try:
+                tenant = self.repository.get(notification.tenant_id)
+                yield notification.originator_version, tenant
+            except KeyError:
+                continue
 
     def get_by_identification_number(
         self, identification_number: str
@@ -106,8 +205,16 @@ class TenantRepository(EventSourcingApplication):
 class LeaseRepository(EventSourcingApplication):
     """Repository for Lease aggregates"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lease_log: EventSourcedLog[LeaseLogged] = EventSourcedLog(
+            self.events, uuid5(NAMESPACE_URL, "/lease_log"), LeaseLogged
+        )
+
     def save(self, lease: Lease) -> None:
-        self.save_aggregate(lease)
+        # Use save() method from the Application class to save the aggregate
+        super().save(lease)
+        self.lease_log.trigger_event(lease_id=lease.id)
 
     def get(self, lease_id: Union[str, UUID]) -> Optional[Lease]:
         try:
@@ -116,11 +223,32 @@ class LeaseRepository(EventSourcingApplication):
             return None
 
     def get_all(self) -> List[Lease]:
-        return [
-            self.repository.get(lease_id)
-            for lease_id in self.repository.get_all_notifications()
-            if isinstance(self.repository.get(lease_id), Lease)
-        ]
+        leases = []
+        for notification in self.lease_log.get():
+            try:
+                lease = self.repository.get(notification.lease_id)
+                if isinstance(lease, Lease):
+                    leases.append(lease)
+            except KeyError:
+                # Entity might have been deleted
+                continue
+        return leases
+
+    def get_leases(
+        self,
+        *,
+        gt: int | None = None,
+        lte: int | None = None,
+        desc: bool = True,
+        limit: int | None = None,
+    ) -> Iterator[Tuple[int, Lease]]:
+        """Get leases with their notification positions for cursor-based pagination."""
+        for notification in self.lease_log.get(gt=gt, lte=lte, desc=desc, limit=limit):
+            try:
+                lease = self.repository.get(notification.lease_id)
+                yield notification.originator_version, lease
+            except KeyError:
+                continue
 
     def get_by_unit_id(self, unit_id: Union[str, UUID]) -> List[Lease]:
         """Find all leases for a specific unit"""
