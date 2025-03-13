@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fastapi_eventsourcing
+      - EVENTSOURCING_POSTGRES_SCHEMA=event_store
+    depends_on:
+      - db
+    restart: on-failure
+
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - .postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=fastapi_eventsourcing
+    ports:
+      - "5432:5432"
+    restart: on-failure
