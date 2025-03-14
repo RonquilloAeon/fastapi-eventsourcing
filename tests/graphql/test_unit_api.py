@@ -80,14 +80,30 @@ def test_get_units_query(client):
         assert address in api_addresses
 
 
-def test_update_unit_amenities_mutation(client, sample_unit):
+def test_update_unit_amenities_mutation(client):
     """Test updating a unit's amenities through the GraphQL API"""
+    # Create a unit
+    create_query = """
+    mutation {
+      createUnit(input: {
+        address: "Some Unit",
+        amenities: []
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_query})
+    assert response.status_code == 200
+    unit_id = response.json()["data"]["createUnit"]["id"]
+
+    # Now update the unit
     new_amenities = ["Updated Amenity 1", "Updated Amenity 2", "Updated Amenity 3"]
 
     query = f"""
     mutation {{
       updateUnitAmenities(
-        id: "{sample_unit.id}",
+        id: "{unit_id}",
         amenities: {json.dumps(new_amenities)}
       ) {{
         id
@@ -104,15 +120,31 @@ def test_update_unit_amenities_mutation(client, sample_unit):
     assert "errors" not in data
 
     unit_data = data["data"]["updateUnitAmenities"]
-    assert unit_data["id"] == str(sample_unit.id)
+    assert unit_data["id"] == unit_id
     assert unit_data["amenities"] == new_amenities
 
 
-def test_mark_unit_as_leased_mutation(client, sample_unit):
+def test_mark_unit_as_leased_mutation(client):
     """Test marking a unit as leased through the GraphQL API"""
+    # Create a unit that will be marked as leased
+    create_leased_query = """
+    mutation {
+      createUnit(input: {
+        address: "Some Unit",
+        amenities: []
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_leased_query})
+    assert response.status_code == 200
+    leased_unit_id = response.json()["data"]["createUnit"]["id"]
+
+    # Mark the unit as leased
     query = f"""
     mutation {{
-      markUnitAsLeased(id: "{sample_unit.id}") {{
+      markUnitAsLeased(id: "{leased_unit_id}") {{
         id
         address
         isLeased
@@ -127,7 +159,7 @@ def test_mark_unit_as_leased_mutation(client, sample_unit):
     assert "errors" not in data
 
     unit_data = data["data"]["markUnitAsLeased"]
-    assert unit_data["id"] == str(sample_unit.id)
+    assert unit_data["id"] == leased_unit_id
     assert unit_data["isLeased"] is True
 
 

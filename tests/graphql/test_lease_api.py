@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 
-def test_create_lease_mutation(client, sample_unit, sample_tenant):
+def test_create_lease_mutation(client, unit, approved_tenant):
     """Test creating a lease through the GraphQL API"""
     start_date = date.today()
     end_date = start_date + timedelta(days=365)  # 1 year lease
@@ -9,8 +9,8 @@ def test_create_lease_mutation(client, sample_unit, sample_tenant):
     query = f"""
     mutation {{
       createLease(input: {{
-        unitId: "{sample_unit.id}",
-        tenantIds: ["{sample_tenant.id}"],
+        unitId: "{unit['id']}",
+        tenantIds: ["{approved_tenant['id']}"],
         startDate: "{start_date.isoformat()}",
         endDate: "{end_date.isoformat()}"
       }}) {{
@@ -38,16 +38,16 @@ def test_create_lease_mutation(client, sample_unit, sample_tenant):
     assert lease_data["startDate"] == start_date.isoformat()
     assert lease_data["endDate"] == end_date.isoformat()
     assert lease_data["signedByTenant"] is False
-    assert lease_data["unit"]["address"] == sample_unit.address
+    assert lease_data["unit"]["address"] == unit["address"]
     assert len(lease_data["tenants"]) == 1
-    assert sample_tenant.first_name in lease_data["tenants"][0]["fullName"]
+    assert approved_tenant["firstName"] in lease_data["tenants"][0]["fullName"]
 
 
-def test_sign_lease_mutation(client, sample_lease):
+def test_sign_lease_mutation(client, lease):
     """Test signing a lease through the GraphQL API"""
     query = f"""
     mutation {{
-      signLease(id: "{sample_lease.id}") {{
+      signLease(id: "{lease['id']}") {{
         id
         signedByTenant
         signedAt
@@ -62,7 +62,7 @@ def test_sign_lease_mutation(client, sample_lease):
     assert "errors" not in data
 
     lease_data = data["data"]["signLease"]
-    assert lease_data["id"] == str(sample_lease.id)
+    assert lease_data["id"] == lease["id"]
     assert lease_data["signedByTenant"] is True
     assert lease_data["signedAt"] is not None
 

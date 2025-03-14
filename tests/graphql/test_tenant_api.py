@@ -124,15 +124,34 @@ def test_approve_tenant_mutation(client):
     assert tenant_data["isApproved"] is True
 
 
-def test_update_tenant_contact_mutation(client, sample_tenant):
+def test_update_tenant_contact_mutation(client):
     """Test updating a tenant's contact information through the GraphQL API"""
+    create_tenant = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "123-45-6789",
+        firstName: "Original",
+        lastName: "Person",
+        email: "original@example.com",
+        phoneNumber: "555-123-4567",
+        dob: "1980-01-01"
+      }) {
+        id
+        identificationNumber
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_tenant})
+    assert response.status_code == 200
+    tenant_id = response.json()["data"]["createTenant"]["id"]
+
     new_email = "new.email@example.com"
     new_phone = "555-999-8888"
 
     query = f"""
     mutation {{
       updateTenantContact(
-        id: "{sample_tenant.id}",
+        id: "{tenant_id}",
         email: "{new_email}",
         phoneNumber: "{new_phone}"
       ) {{
@@ -150,7 +169,7 @@ def test_update_tenant_contact_mutation(client, sample_tenant):
     assert "errors" not in data
 
     tenant_data = data["data"]["updateTenantContact"]
-    assert tenant_data["id"] == str(sample_tenant.id)
+    assert tenant_data["id"] == tenant_id
     assert tenant_data["email"] == new_email
     assert tenant_data["phoneNumber"] == new_phone
 
