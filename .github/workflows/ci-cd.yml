@@ -20,6 +20,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox
       - name: Run tests
-        run: nox -s tests -- -x
+        run: nox -s test -- -x
       - name: Run linting
         run: nox -s lint
