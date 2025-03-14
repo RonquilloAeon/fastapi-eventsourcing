@@ -13,16 +13,6 @@ from src.domain.models import Unit, Tenant, Lease
 from src.domain.repositories import UnitRepository, TenantRepository, LeaseRepository
 
 
-# @pytest.fixture(autouse=True)
-# def cleanup_database():
-#     """Clean up the test database before each test"""
-#     if os.path.exists("test.db"):
-#         os.remove("test.db")
-#     yield
-#     if os.path.exists("test.db"):
-#         os.remove("test.db")
-
-
 @pytest.fixture
 def client():
     """Returns a TestClient for the FastAPI application"""
