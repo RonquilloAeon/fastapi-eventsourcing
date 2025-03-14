@@ -1,18 +1,21 @@
 import pytest
 from uuid import UUID
 from src.domain.models import Unit
+from datetime import datetime
 
 
 def test_unit_creation():
     """Test that a unit can be created with proper attributes"""
     address = "456 Test Ave, Test City"
     amenities = ["Parking", "Gym"]
+    built_in = 1985
 
-    unit = Unit.create(address=address, amenities=amenities)
+    unit = Unit.create(address=address, amenities=amenities, built_in=built_in)
 
     assert isinstance(unit.id, UUID)
     assert unit.address == address
     assert unit.amenities == amenities
+    assert unit.built_in == built_in
     assert unit.is_leasable is True
     assert unit.is_leased is False
 
@@ -79,3 +82,24 @@ def test_unit_update_address(sample_unit):
     sample_unit.update_address(new_address)
 
     assert sample_unit.address == new_address
+
+
+def test_unit_update_built_in_year(sample_unit):
+    """Test that unit built_in year can be updated"""
+    new_year = 1990
+
+    sample_unit.update_built_in_year(new_year)
+
+    assert sample_unit.built_in == new_year
+
+
+def test_unit_built_in_year_validation():
+    """Test that built_in year validation works correctly"""
+    unit = Unit.create(address="Test Address")
+    current_year = datetime.now().year
+
+    with pytest.raises(ValueError):
+        unit.update_built_in_year(1799)  # Too early
+
+    with pytest.raises(ValueError):
+        unit.update_built_in_year(current_year + 1)  # Future year

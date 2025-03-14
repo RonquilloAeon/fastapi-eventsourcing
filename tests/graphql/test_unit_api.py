@@ -33,6 +33,32 @@ def test_create_unit_mutation(client):
     assert "id" in unit_data
 
 
+def test_create_unit_with_built_in_year(client):
+    """Test creating a unit with built_in year through the GraphQL API"""
+    query = """
+    mutation {
+      createUnit(input: {
+        address: "123 Built In Test St",
+        amenities: [],
+        builtIn: 1985
+      }) {
+        id
+        address
+        builtIn
+      }
+    }
+    """
+
+    response = client.post("/graphql", json={"query": query})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "errors" not in data
+
+    unit_data = data["data"]["createUnit"]
+    assert unit_data["builtIn"] == 1985
+
+
 def test_get_units_query(client):
     """Test retrieving units through the GraphQL API"""
     # Create some units through the API
@@ -122,6 +148,82 @@ def test_update_unit_amenities_mutation(client):
     unit_data = data["data"]["updateUnitAmenities"]
     assert unit_data["id"] == unit_id
     assert unit_data["amenities"] == new_amenities
+
+
+def test_update_unit_built_in_mutation(client):
+    """Test updating a unit's built_in year through the GraphQL API"""
+    # Create a unit
+    create_query = """
+    mutation {
+      createUnit(input: {
+        address: "123 Update Built In Test St",
+        amenities: []
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_query})
+    assert response.status_code == 200
+    unit_id = response.json()["data"]["createUnit"]["id"]
+
+    # Update the built_in year
+    update_query = f"""
+    mutation {{
+      updateUnitBuiltIn(
+        id: "{unit_id}",
+        year: 1990
+      ) {{
+        id
+        address
+        builtIn
+      }}
+    }}
+    """
+
+    response = client.post("/graphql", json={"query": update_query})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "errors" not in data
+
+    unit_data = data["data"]["updateUnitBuiltIn"]
+    assert unit_data["id"] == unit_id
+    assert unit_data["builtIn"] == 1990
+
+
+def test_update_unit_built_in_validation(client):
+    """Test that updating unit built_in year validates the input"""
+    # Create a unit
+    create_query = """
+    mutation {
+      createUnit(input: {
+        address: "123 Built In Validation Test St",
+        amenities: []
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_query})
+    assert response.status_code == 200
+    unit_id = response.json()["data"]["createUnit"]["id"]
+
+    # Try to update with an invalid year (too early)
+    update_query = f"""
+    mutation {{
+      updateUnitBuiltIn(
+        id: "{unit_id}",
+        year: 1799
+      ) {{
+        id
+      }}
+    }}
+    """
+
+    response = client.post("/graphql", json={"query": update_query})
+    data = response.json()
+    assert "errors" in data
 
 
 def test_mark_unit_as_leased_mutation(client):

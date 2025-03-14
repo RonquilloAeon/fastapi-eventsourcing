@@ -16,6 +16,7 @@ class UnitType:
     amenities: List[str]
     is_leasable: bool
     is_leased: bool
+    built_in: Optional[int]
     created_at: datetime
 
     @strawberry.field
@@ -105,6 +106,7 @@ class LeaseType:
 class UnitInput:
     address: str
     amenities: List[str] = strawberry.field(default_factory=list)
+    built_in: Optional[int] = None
 
 
 @strawberry.input
@@ -189,7 +191,9 @@ class Mutation:
     @strawberry.mutation
     def create_unit(self, info: Info, input: UnitInput) -> UnitType:
         repo = info.context["unit_repo"]
-        unit = Unit.create(address=input.address, amenities=input.amenities)
+        unit = Unit.create(
+            address=input.address, amenities=input.amenities, built_in=input.built_in
+        )
         repo.create(unit)
         return unit
 
@@ -338,3 +342,16 @@ class Mutation:
             unit_repo.save(unit)
 
         return lease
+
+    @strawberry.mutation
+    def update_unit_built_in(
+        self, info: Info, id: strawberry.ID, year: int
+    ) -> UnitType:
+        repo = info.context["unit_repo"]
+        unit = repo.get(UUID(id))
+        if not unit:
+            raise ValueError(f"Unit with ID {id} not found")
+
+        unit.update_built_in_year(year)
+        repo.save(unit)
+        return unit

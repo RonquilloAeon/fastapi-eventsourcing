@@ -8,16 +8,27 @@ class Unit(Aggregate):
     """Unit aggregate root representing a rental property"""
 
     @event("Created")
-    def __init__(self, address: str, amenities: Optional[List[str]] = None):
+    def __init__(
+        self,
+        address: str,
+        amenities: Optional[List[str]] = None,
+        built_in: Optional[int] = None,
+    ):
         self.address = address
         self.amenities = amenities or []
         self.is_leasable = True
         self.is_leased = False
+        self.built_in = built_in
         self.created_at = datetime.now()
 
     @classmethod
-    def create(cls, address: str, amenities: Optional[List[str]] = None) -> "Unit":
-        return cls(address=address, amenities=amenities)
+    def create(
+        cls,
+        address: str,
+        amenities: Optional[List[str]] = None,
+        built_in: Optional[int] = None,
+    ) -> "Unit":
+        return cls(address=address, amenities=amenities, built_in=built_in)
 
     @event("MarkedAsLeased")
     def mark_as_leased(self) -> None:
@@ -44,6 +55,14 @@ class Unit(Aggregate):
     @event("AddressUpdated")
     def update_address(self, address: str) -> None:
         self.address = address
+
+    @event("BuiltInYearUpdated")
+    def update_built_in_year(self, year: int) -> None:
+        if not (1800 <= year <= datetime.now().year):
+            raise ValueError(
+                f"Built-in year must be between 1800 and {datetime.now().year}"
+            )
+        self.built_in = year
 
 
 class Tenant(Aggregate):
