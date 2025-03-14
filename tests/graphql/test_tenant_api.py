@@ -1,6 +1,3 @@
-from datetime import date
-
-
 def test_create_tenant_mutation(client):
     """Test creating a tenant through the GraphQL API"""
     query = """
@@ -38,12 +35,33 @@ def test_create_tenant_mutation(client):
     assert "id" in tenant_data
 
 
-def test_duplicate_identification_tenant(client, sample_tenant, tenant_repository):
+def test_duplicate_identification_tenant(client):
     """Test that creating a tenant with duplicate identification number fails"""
+    # Create first tenant
+    create_first_tenant = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "123-45-6789",
+        firstName: "Original",
+        lastName: "Person",
+        email: "original@example.com",
+        phoneNumber: "555-123-4567",
+        dob: "1980-01-01"
+      }) {
+        id
+        identificationNumber
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_first_tenant})
+    assert response.status_code == 200
+    first_tenant = response.json()["data"]["createTenant"]
+
+    # Try to create second tenant with same identification number
     query = f"""
     mutation {{
       createTenant(input: {{
-        identificationNumber: "{sample_tenant.identification_number}",
+        identificationNumber: "{first_tenant['identificationNumber']}",
         firstName: "Duplicate",
         lastName: "Person",
         email: "duplicate@example.com",
@@ -56,30 +74,37 @@ def test_duplicate_identification_tenant(client, sample_tenant, tenant_repositor
     """
 
     response = client.post("/graphql", json={"query": query})
-
     assert response.status_code == 200
     data = response.json()
     # Should have errors due to duplicate identification number
     assert "errors" in data
 
 
-def test_approve_tenant_mutation(client, tenant_repository):
+def test_approve_tenant_mutation(client):
     """Test approving a tenant through the GraphQL API"""
     # Create an unapproved tenant
-    tenant = tenant_repository._repository.create_originator(
-        identification_number="444-55-6666",
-        first_name="Pending",
-        last_name="Approval",
-        email="pending@example.com",
-        phone_number="555-333-4444",
-        dob=date(1995, 10, 10),
-        is_approved=False,
-    )
-    tenant_repository.create(tenant)
+    create_tenant_query = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "444-55-6666",
+        firstName: "Pending",
+        lastName: "Approval",
+        email: "pending@example.com",
+        phoneNumber: "555-333-4444",
+        dob: "1995-10-10"
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_tenant_query})
+    assert response.status_code == 200
+    tenant_id = response.json()["data"]["createTenant"]["id"]
 
+    # Approve the tenant
     query = f"""
     mutation {{
-      approveTenant(id: "{tenant.id}") {{
+      approveTenant(id: "{tenant_id}") {{
         id
         firstName
         lastName
@@ -95,7 +120,7 @@ def test_approve_tenant_mutation(client, tenant_repository):
     assert "errors" not in data
 
     tenant_data = data["data"]["approveTenant"]
-    assert tenant_data["id"] == str(tenant.id)
+    assert tenant_data["id"] == tenant_id
     assert tenant_data["isApproved"] is True
 
 
@@ -130,31 +155,56 @@ def test_update_tenant_contact_mutation(client, sample_tenant):
     assert tenant_data["phoneNumber"] == new_phone
 
 
-def test_approved_tenants_query(client, tenant_repository):
+def test_approved_tenants_query(client):
     """Test retrieving approved tenants through the GraphQL API"""
-    # Create tenants with different approval statuses
-    approved = tenant_repository._repository.create_originator(
-        identification_number="approved-123",
-        first_name="Approved",
-        last_name="Person",
-        email="approved@example.com",
-        phone_number="555-123-4567",
-        dob=date(1980, 1, 1),
-        is_approved=True,
-    )
+    # Create approved tenant
+    create_approved_query = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "approved-123",
+        firstName: "Approved",
+        lastName: "Person",
+        email: "approved@example.com",
+        phoneNumber: "555-123-4567",
+        dob: "1980-01-01"
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_approved_query})
+    assert response.status_code == 200
+    approved_id = response.json()["data"]["createTenant"]["id"]
 
-    unapproved = tenant_repository._repository.create_originator(
-        identification_number="unapproved-123",
-        first_name="Unapproved",
-        last_name="Person",
-        email="unapproved@example.com",
-        phone_number="555-123-4567",
-        dob=date(1980, 1, 1),
-        is_approved=False,
-    )
+    # Approve the tenant
+    approve_query = f"""
+    mutation {{
+      approveTenant(id: "{approved_id}") {{
+        id
+        isApproved
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": approve_query})
+    assert response.status_code == 200
 
-    for tenant in [approved, unapproved]:
-        tenant_repository.create(tenant)
+    # Create unapproved tenant
+    create_unapproved_query = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "unapproved-123",
+        firstName: "Unapproved",
+        lastName: "Person",
+        email: "unapproved@example.com",
+        phoneNumber: "555-123-4567",
+        dob: "1980-01-01"
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_unapproved_query})
+    assert response.status_code == 200
 
     # Query approved tenants
     query = """

@@ -1,10 +1,11 @@
 import strawberry
 from typing import List, Optional
 from datetime import datetime, date
+from uuid import UUID
 
 # Import our domain models and repositories
 from ..domain.models import Unit, Tenant, Lease
-from ..domain.repositories import UnitRepository, TenantRepository, LeaseRepository
+from strawberry.types import Info
 
 
 # GraphQL Types - Rental Management
@@ -18,14 +19,14 @@ class UnitType:
     created_at: datetime
 
     @strawberry.field
-    def leases(self) -> List["LeaseType"]:
-        repo = LeaseRepository()
-        return repo.get_by_unit_id(self.id)
+    def leases(self, info: Info) -> List["LeaseType"]:
+        repo = info.context["lease_repo"]
+        return repo.get_by_unit_id(UUID(self.id))
 
     @strawberry.field
-    def active_lease(self) -> Optional["LeaseType"]:
-        repo = LeaseRepository()
-        leases = repo.get_by_unit_id(self.id)
+    def active_lease(self, info: Info) -> Optional["LeaseType"]:
+        repo = info.context["lease_repo"]
+        leases = repo.get_by_unit_id(UUID(self.id))
         today = date.today()
         active_leases = [
             lease
@@ -52,14 +53,14 @@ class TenantType:
         return f"{self.first_name} {self.last_name}"
 
     @strawberry.field
-    def leases(self) -> List["LeaseType"]:
-        repo = LeaseRepository()
-        return repo.get_by_tenant_id(self.id)
+    def leases(self, info: Info) -> List["LeaseType"]:
+        repo = info.context["lease_repo"]
+        return repo.get_by_tenant_id(UUID(self.id))
 
     @strawberry.field
-    def active_leases(self) -> List["LeaseType"]:
-        repo = LeaseRepository()
-        all_tenant_leases = repo.get_by_tenant_id(self.id)
+    def active_leases(self, info: Info) -> List["LeaseType"]:
+        repo = info.context["lease_repo"]
+        all_tenant_leases = repo.get_by_tenant_id(UUID(self.id))
         today = date.today()
         return [
             lease
@@ -80,15 +81,17 @@ class LeaseType:
     tenant_ids: List[strawberry.ID]
 
     @strawberry.field
-    def unit(self) -> Optional[UnitType]:
-        repo = UnitRepository()
-        return repo.get(self.unit_id)
+    def unit(self, info: Info) -> Optional[UnitType]:
+        repo = info.context["unit_repo"]
+        return repo.get(UUID(self.unit_id))
 
     @strawberry.field
-    def tenants(self) -> List[TenantType]:
-        repo = TenantRepository()
+    def tenants(self, info: Info) -> List[TenantType]:
+        repo = info.context["tenant_repo"]
         return [
-            repo.get(tenant_id) for tenant_id in self.tenant_ids if repo.get(tenant_id)
+            repo.get(UUID(tenant_id))
+            for tenant_id in self.tenant_ids
+            if repo.get(UUID(tenant_id))
         ]
 
     @strawberry.field
@@ -127,55 +130,55 @@ class LeaseInput:
 class Query:
     # Rental Management Queries
     @strawberry.field
-    def unit(self, id: strawberry.ID) -> Optional[UnitType]:
-        repo = UnitRepository()
-        return repo.get(id)
+    def unit(self, info: Info, id: strawberry.ID) -> Optional[UnitType]:
+        repo = info.context["unit_repo"]
+        return repo.get(UUID(id))
 
     @strawberry.field
-    def units(self) -> List[UnitType]:
-        repo = UnitRepository()
+    def units(self, info: Info) -> List[UnitType]:
+        repo = info.context["unit_repo"]
         return repo.get_all()
 
     @strawberry.field
-    def available_units(self) -> List[UnitType]:
-        repo = UnitRepository()
+    def available_units(self, info: Info) -> List[UnitType]:
+        repo = info.context["unit_repo"]
         return repo.get_available_units()
 
     @strawberry.field
-    def tenant(self, id: strawberry.ID) -> Optional[TenantType]:
-        repo = TenantRepository()
-        return repo.get(id)
+    def tenant(self, info: Info, id: strawberry.ID) -> Optional[TenantType]:
+        repo = info.context["tenant_repo"]
+        return repo.get(UUID(id))
 
     @strawberry.field
     def tenant_by_identification(
-        self, identification_number: str
+        self, info: Info, identification_number: str
     ) -> Optional[TenantType]:
-        repo = TenantRepository()
+        repo = info.context["tenant_repo"]
         return repo.get_by_identification_number(identification_number)
 
     @strawberry.field
-    def tenants(self) -> List[TenantType]:
-        repo = TenantRepository()
+    def tenants(self, info: Info) -> List[TenantType]:
+        repo = info.context["tenant_repo"]
         return repo.get_all()
 
     @strawberry.field
-    def approved_tenants(self) -> List[TenantType]:
-        repo = TenantRepository()
+    def approved_tenants(self, info: Info) -> List[TenantType]:
+        repo = info.context["tenant_repo"]
         return repo.get_approved_tenants()
 
     @strawberry.field
-    def lease(self, id: strawberry.ID) -> Optional[LeaseType]:
-        repo = LeaseRepository()
-        return repo.get(id)
+    def lease(self, info: Info, id: strawberry.ID) -> Optional[LeaseType]:
+        repo = info.context["lease_repo"]
+        return repo.get(UUID(id))
 
     @strawberry.field
-    def leases(self) -> List[LeaseType]:
-        repo = LeaseRepository()
+    def leases(self, info: Info) -> List[LeaseType]:
+        repo = info.context["lease_repo"]
         return repo.get_all()
 
     @strawberry.field
-    def active_leases(self) -> List[LeaseType]:
-        repo = LeaseRepository()
+    def active_leases(self, info: Info) -> List[LeaseType]:
+        repo = info.context["lease_repo"]
         return repo.get_active_leases()
 
 
@@ -184,18 +187,18 @@ class Query:
 class Mutation:
     # Rental Management Mutations
     @strawberry.mutation
-    def create_unit(self, input: UnitInput) -> UnitType:
-        repo = UnitRepository()
+    def create_unit(self, info: Info, input: UnitInput) -> UnitType:
+        repo = info.context["unit_repo"]
         unit = Unit.create(address=input.address, amenities=input.amenities)
         repo.create(unit)
         return unit
 
     @strawberry.mutation
     def update_unit_amenities(
-        self, id: strawberry.ID, amenities: List[str]
+        self, info: Info, id: strawberry.ID, amenities: List[str]
     ) -> UnitType:
-        repo = UnitRepository()
-        unit = repo.get(id)
+        repo = info.context["unit_repo"]
+        unit = repo.get(UUID(id))
         if not unit:
             raise ValueError(f"Unit with ID {id} not found")
 
@@ -204,9 +207,9 @@ class Mutation:
         return unit
 
     @strawberry.mutation
-    def mark_unit_as_leased(self, id: strawberry.ID) -> UnitType:
-        repo = UnitRepository()
-        unit = repo.get(id)
+    def mark_unit_as_leased(self, info: Info, id: strawberry.ID) -> UnitType:
+        repo = info.context["unit_repo"]
+        unit = repo.get(UUID(id))
         if not unit:
             raise ValueError(f"Unit with ID {id} not found")
 
@@ -215,9 +218,9 @@ class Mutation:
         return unit
 
     @strawberry.mutation
-    def mark_unit_as_available(self, id: strawberry.ID) -> UnitType:
-        repo = UnitRepository()
-        unit = repo.get(id)
+    def mark_unit_as_available(self, info: Info, id: strawberry.ID) -> UnitType:
+        repo = info.context["unit_repo"]
+        unit = repo.get(UUID(id))
         if not unit:
             raise ValueError(f"Unit with ID {id} not found")
 
@@ -226,8 +229,8 @@ class Mutation:
         return unit
 
     @strawberry.mutation
-    def create_tenant(self, input: TenantInput) -> TenantType:
-        repo = TenantRepository()
+    def create_tenant(self, info: Info, input: TenantInput) -> TenantType:
+        repo = info.context["tenant_repo"]
 
         # Check if tenant with same identification number already exists
         existing_tenant = repo.get_by_identification_number(input.identification_number)
@@ -248,9 +251,9 @@ class Mutation:
         return tenant
 
     @strawberry.mutation
-    def approve_tenant(self, id: strawberry.ID) -> TenantType:
-        repo = TenantRepository()
-        tenant = repo.get(id)
+    def approve_tenant(self, info: Info, id: strawberry.ID) -> TenantType:
+        repo = info.context["tenant_repo"]
+        tenant = repo.get(UUID(id))
         if not tenant:
             raise ValueError(f"Tenant with ID {id} not found")
 
@@ -259,9 +262,9 @@ class Mutation:
         return tenant
 
     @strawberry.mutation
-    def disapprove_tenant(self, id: strawberry.ID) -> TenantType:
-        repo = TenantRepository()
-        tenant = repo.get(id)
+    def disapprove_tenant(self, info: Info, id: strawberry.ID) -> TenantType:
+        repo = info.context["tenant_repo"]
+        tenant = repo.get(UUID(id))
         if not tenant:
             raise ValueError(f"Tenant with ID {id} not found")
 
@@ -272,12 +275,13 @@ class Mutation:
     @strawberry.mutation
     def update_tenant_contact(
         self,
+        info: Info,
         id: strawberry.ID,
         email: Optional[str] = None,
         phone_number: Optional[str] = None,
     ) -> TenantType:
-        repo = TenantRepository()
-        tenant = repo.get(id)
+        repo = info.context["tenant_repo"]
+        tenant = repo.get(UUID(id))
         if not tenant:
             raise ValueError(f"Tenant with ID {id} not found")
 
@@ -286,10 +290,10 @@ class Mutation:
         return tenant
 
     @strawberry.mutation
-    def create_lease(self, input: LeaseInput) -> LeaseType:
+    def create_lease(self, info: Info, input: LeaseInput) -> LeaseType:
         # Validate unit exists
-        unit_repo = UnitRepository()
-        unit = unit_repo.get(input.unit_id)
+        unit_repo = info.context["unit_repo"]
+        unit = unit_repo.get(UUID(input.unit_id))
         if not unit:
             raise ValueError(f"Unit with ID {input.unit_id} not found")
 
@@ -297,16 +301,16 @@ class Mutation:
             raise ValueError(f"Unit with ID {input.unit_id} is not leasable")
 
         # Validate all tenants exist and are approved
-        tenant_repo = TenantRepository()
+        tenant_repo = info.context["tenant_repo"]
         for tenant_id in input.tenant_ids:
-            tenant = tenant_repo.get(tenant_id)
+            tenant = tenant_repo.get(UUID(tenant_id))
             if not tenant:
                 raise ValueError(f"Tenant with ID {tenant_id} not found")
             if not tenant.is_approved:
                 raise ValueError(f"Tenant with ID {tenant_id} is not approved")
 
         # Create the lease
-        lease_repo = LeaseRepository()
+        lease_repo = info.context["lease_repo"]
         lease = Lease.create(
             unit_id=input.unit_id,
             tenant_ids=input.tenant_ids,
@@ -317,18 +321,18 @@ class Mutation:
         return lease
 
     @strawberry.mutation
-    def sign_lease(self, id: strawberry.ID) -> LeaseType:
-        repo = LeaseRepository()
-        lease = repo.get(id)
+    def sign_lease(self, info: Info, id: strawberry.ID) -> LeaseType:
+        lease_repo = info.context["lease_repo"]
+        lease = lease_repo.get(UUID(id))
         if not lease:
             raise ValueError(f"Lease with ID {id} not found")
 
         lease.sign_by_tenant()
-        repo.save(lease)
+        lease_repo.save(lease)
 
         # When lease is signed, mark the unit as leased
-        unit_repo = UnitRepository()
-        unit = unit_repo.get(lease.unit_id)
+        unit_repo = info.context["unit_repo"]
+        unit = unit_repo.get(UUID(lease.unit_id))
         if unit:
             unit.mark_as_leased()
             unit_repo.save(unit)

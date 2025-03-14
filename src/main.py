@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import strawberry
@@ -5,13 +6,27 @@ from strawberry.fastapi import GraphQLRouter
 from .graphql.schema import Query, Mutation
 from .domain.repositories import UnitRepository, TenantRepository, LeaseRepository
 
-# Create repositories for initializing database
-unit_repo = UnitRepository()
-tenant_repo = TenantRepository()
-lease_repo = LeaseRepository()
+# Application state
+app_state = {}
 
-# Initialize FastAPI app
-app = FastAPI(title="FastAPI EventSourcing GraphQL API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize repositories
+    app_state["unit_repo"] = UnitRepository()
+    app_state["tenant_repo"] = TenantRepository()
+    app_state["lease_repo"] = LeaseRepository()
+
+    yield
+
+    # Clean up repositories
+    app_state["unit_repo"].close()
+    app_state["tenant_repo"].close()
+    app_state["lease_repo"].close()
+
+
+# Initialize FastAPI app with lifespan management
+app = FastAPI(title="FastAPI EventSourcing GraphQL API", lifespan=lifespan)
 
 # Setup CORS
 app.add_middleware(
@@ -25,8 +40,18 @@ app.add_middleware(
 # Create GraphQL schema with Strawberry
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
-# Create a GraphQL route
-graphql_app = GraphQLRouter(schema)
+
+# Create a GraphQL route with custom context
+async def get_context():
+    # Use repositories from app state
+    return {
+        "unit_repo": app_state["unit_repo"],
+        "tenant_repo": app_state["tenant_repo"],
+        "lease_repo": app_state["lease_repo"],
+    }
+
+
+graphql_app = GraphQLRouter(schema, context_getter=get_context)
 
 # Add the GraphQL routes to the FastAPI application
 app.include_router(graphql_app, prefix="/graphql")
@@ -48,4 +73,4 @@ def root():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -65,3 +65,4 @@ a_playground/
 .DS_Store
 .postgres_data
 .python-version
+*.db-*

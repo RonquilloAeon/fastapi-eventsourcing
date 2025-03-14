@@ -67,63 +67,132 @@ def test_sign_lease_mutation(client, sample_lease):
     assert lease_data["signedAt"] is not None
 
 
-def test_active_leases_query(
-    client, lease_repository, unit_repository, tenant_repository
-):
+def test_active_leases_query(client):
     """Test retrieving active leases through the GraphQL API"""
-    # Create units and tenants for leases
-    unit1 = unit_repository._repository.create_originator(
-        address="Active Lease Unit", is_leasable=True, is_leased=False, amenities=[]
-    )
-    unit_repository.create(unit1)
+    # Create a unit via API
+    create_unit_query = """
+    mutation {
+      createUnit(input: {
+        address: "Active Lease Unit",
+        amenities: []
+      }) {
+        id
+        address
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_unit_query})
+    assert response.status_code == 200
+    unit_data = response.json()["data"]["createUnit"]
+    unit_id = unit_data["id"]
 
-    tenant1 = tenant_repository._repository.create_originator(
-        identification_number="active-lease-tenant",
-        first_name="Active",
-        last_name="Tenant",
-        email="active@example.com",
-        phone_number="555-123-7890",
-        dob=date(1985, 5, 15),
-        is_approved=True,
-    )
-    tenant_repository.create(tenant1)
+    # Create a tenant via API
+    create_tenant_query = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "active-lease-tenant",
+        firstName: "Active",
+        lastName: "Tenant",
+        email: "active@example.com",
+        phoneNumber: "555-123-7890",
+        dob: "1985-05-15"
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_tenant_query})
+    assert response.status_code == 200
+    tenant_data = response.json()["data"]["createTenant"]
+    tenant_id = tenant_data["id"]
 
-    # Create an active lease (signed and within date range)
+    # Approve the tenant
+    approve_tenant_query = f"""
+    mutation {{
+      approveTenant(id: "{tenant_id}") {{
+        id
+        isApproved
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": approve_tenant_query})
+    assert response.status_code == 200
+
     today = date.today()
-    active_lease = lease_repository._repository.create_originator(
-        unit_id=unit1.id,
-        tenant_ids=[tenant1.id],
-        start_date=today - timedelta(days=30),  # Started 30 days ago
-        end_date=today + timedelta(days=335),  # Ends in 335 days
-        generated_at=today - timedelta(days=45),
-        signed_at=today - timedelta(days=29),
-        signed_by_tenant=True,
-    )
 
-    # Create an inactive lease (not signed)
-    inactive_lease = lease_repository._repository.create_originator(
-        unit_id=unit1.id,
-        tenant_ids=[tenant1.id],
-        start_date=today + timedelta(days=30),  # Starts in 30 days
-        end_date=today + timedelta(days=395),  # Ends in 395 days
-        generated_at=today - timedelta(days=5),
-        signed_at=None,
-        signed_by_tenant=False,
-    )
+    # Create an active lease (will be signed later)
+    create_active_lease_query = f"""
+    mutation {{
+      createLease(input: {{
+        unitId: "{unit_id}",
+        tenantIds: ["{tenant_id}"],
+        startDate: "{(today - timedelta(days=30)).isoformat()}",
+        endDate: "{(today + timedelta(days=335)).isoformat()}"
+      }}) {{
+        id
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": create_active_lease_query})
+    assert response.status_code == 200
+    active_lease_id = response.json()["data"]["createLease"]["id"]
 
-    # Create an expired lease (signed but outside date range)
-    expired_lease = lease_repository._repository.create_originator(
-        unit_id=unit1.id,
-        tenant_ids=[tenant1.id],
-        start_date=today - timedelta(days=400),  # Started 400 days ago
-        end_date=today - timedelta(days=35),  # Ended 35 days ago
-        generated_at=today - timedelta(days=450),
-        signed_at=today - timedelta(days=399),
-        signed_by_tenant=True,
-    )
+    # Sign the active lease
+    sign_lease_query = f"""
+    mutation {{
+      signLease(id: "{active_lease_id}") {{
+        id
+        signedByTenant
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": sign_lease_query})
+    assert response.status_code == 200
 
-    for lease in [active_lease, inactive_lease, expired_lease]:
-        lease_repository.save(lease)
+    # Create an inactive lease (won't be signed)
+    create_inactive_lease_query = f"""
+    mutation {{
+      createLease(input: {{
+        unitId: "{unit_id}",
+        tenantIds: ["{tenant_id}"],
+        startDate: "{(today + timedelta(days=30)).isoformat()}",
+        endDate: "{(today + timedelta(days=395)).isoformat()}"
+      }}) {{
+        id
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": create_inactive_lease_query})
+    assert response.status_code == 200
+
+    # Create an expired lease and sign it
+    create_expired_lease_query = f"""
+    mutation {{
+      createLease(input: {{
+        unitId: "{unit_id}",
+        tenantIds: ["{tenant_id}"],
+        startDate: "{(today - timedelta(days=400)).isoformat()}",
+        endDate: "{(today - timedelta(days=35)).isoformat()}"
+      }}) {{
+        id
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": create_expired_lease_query})
+    assert response.status_code == 200
+    expired_lease_id = response.json()["data"]["createLease"]["id"]
+
+    # Sign the expired lease
+    sign_expired_lease_query = f"""
+    mutation {{
+      signLease(id: "{expired_lease_id}") {{
+        id
+        signedByTenant
+      }}
+    }}
+    """
+    response = client.post("/graphql", json={"query": sign_expired_lease_query})
+    assert response.status_code == 200
 
     # Query active leases
     query = """
@@ -167,28 +236,51 @@ def test_active_leases_query(
     assert found_active_lease is True
 
 
-def test_create_lease_validation(client, sample_unit, tenant_repository):
+def test_create_lease_validation(client):
     """Test that lease creation fails with unapproved tenants"""
-    # Create unapproved tenant
-    unapproved_tenant = tenant_repository._repository.create_originator(
-        identification_number="unapproved-lease-tenant",
-        first_name="Unapproved",
-        last_name="TenantLease",
-        email="unapproved_lease@example.com",
-        phone_number="555-777-8888",
-        dob=date(1982, 3, 20),
-        is_approved=False,
-    )
-    tenant_repository.create(unapproved_tenant)
+    # Create a unit via API
+    create_unit_query = """
+    mutation {
+      createUnit(input: {
+        address: "Validation Test Unit",
+        amenities: []
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_unit_query})
+    assert response.status_code == 200
+    unit_id = response.json()["data"]["createUnit"]["id"]
 
+    # Create an unapproved tenant
+    create_tenant_query = """
+    mutation {
+      createTenant(input: {
+        identificationNumber: "unapproved-lease-tenant",
+        firstName: "Unapproved",
+        lastName: "TenantLease",
+        email: "unapproved_lease@example.com",
+        phoneNumber: "555-777-8888",
+        dob: "1982-03-20"
+      }) {
+        id
+      }
+    }
+    """
+    response = client.post("/graphql", json={"query": create_tenant_query})
+    assert response.status_code == 200
+    tenant_id = response.json()["data"]["createTenant"]["id"]
+
+    # Attempt to create a lease with the unapproved tenant
     start_date = date.today()
     end_date = start_date + timedelta(days=365)
 
     query = f"""
     mutation {{
       createLease(input: {{
-        unitId: "{sample_unit.id}",
-        tenantIds: ["{unapproved_tenant.id}"],
+        unitId: "{unit_id}",
+        tenantIds: ["{tenant_id}"],
         startDate: "{start_date.isoformat()}",
         endDate: "{end_date.isoformat()}"
       }}) {{
@@ -198,7 +290,6 @@ def test_create_lease_validation(client, sample_unit, tenant_repository):
     """
 
     response = client.post("/graphql", json={"query": query})
-
     assert response.status_code == 200
     data = response.json()
     # Should have errors due to unapproved tenant

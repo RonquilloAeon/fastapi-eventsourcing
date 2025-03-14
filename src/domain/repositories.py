@@ -69,7 +69,7 @@ class UnitRepository(EventSourcingApplication):
         # Use save() method from the Application class to save the aggregate
         super().save(unit, *args, **kwargs)
 
-    def get(self, unit_id: Union[str, UUID]) -> Optional[Unit]:
+    def get(self, unit_id: UUID) -> Optional[Unit]:
         try:
             return self.repository.get(unit_id)
         except AggregateNotFoundError:
@@ -120,7 +120,7 @@ class TenantRepository(EventSourcingApplication):
         logged = self.tenant_log.trigger_event(tenant_id=tenant.id)
         self.save(tenant, logged)
 
-    def get(self, tenant_id: Union[str, UUID]) -> Optional[Tenant]:
+    def get(self, tenant_id: UUID) -> Optional[Tenant]:
         try:
             return self.repository.get(tenant_id)
         except AggregateNotFoundError:
@@ -215,12 +215,12 @@ class LeaseRepository(EventSourcingApplication):
             except KeyError:
                 continue
 
-    def get_by_unit_id(self, unit_id: Union[str, UUID]) -> List[Lease]:
+    def get_by_unit_id(self, unit_id: UUID) -> List[Lease]:
         """Find all leases for a specific unit"""
         leases = self.get_all()
         return [lease for lease in leases if str(lease.unit_id) == str(unit_id)]
 
-    def get_by_tenant_id(self, tenant_id: Union[str, UUID]) -> List[Lease]:
+    def get_by_tenant_id(self, tenant_id: UUID) -> List[Lease]:
         """Find all leases for a specific tenant"""
         leases = self.get_all()
         return [
